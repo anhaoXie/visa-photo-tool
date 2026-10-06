@@ -22,3 +22,8 @@
 - AI 换背景 / 人脸自动识别（v2 候选）
 - 打印排版、批量处理
 - 账号、付费
+
+
+## 线上地址
+https://visa.anhaoxie.com
+（备用：https://visa-photo-tool-nu.vercel.app）

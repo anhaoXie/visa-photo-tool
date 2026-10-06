@@ -153,6 +153,12 @@ export default function Home() {
             className="mt-4 w-80"
           />
           <p className="mt-2 text-xs text-gray-400">Drag to adjust</p>
+          <button
+            onClick={() => inputRef.current?.click()}
+            className="mt-3 text-sm text-gray-500 underline hover:text-gray-800"
+          >
+            Choose another photo
+          </button>
         </>
       )}
 
