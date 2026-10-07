@@ -3,9 +3,10 @@
 import { useRef, useState } from "react";
 
 const SPECS = [
-  { id: "us", label: "US Visa 2×2 in", w: 600, h: 600 },
-  { id: "schengen", label: "Schengen 35×45 mm", w: 413, h: 531 },
-  { id: "china", label: "China 33×48 mm", w: 390, h: 567 },
+  // oval: 椭圆参考线 = 官方头部要求。top/h 占框高比例，w 占框宽比例
+  { id: "us", label: "US Visa 2×2 in", w: 600, h: 600, oval: { top: 0.11, h: 0.60, w: 0.45 } },
+  { id: "schengen", label: "Schengen 35×45 mm", w: 413, h: 531, oval: { top: 0.07, h: 0.75, w: 0.69 } },
+  { id: "china", label: "China 33×48 mm", w: 390, h: 567, oval: { top: 0.08, h: 0.63, w: 0.56 } },
 ];
 
 export default function Home() {
@@ -129,9 +130,6 @@ export default function Home() {
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
-            // 核心：把屏幕上框住的区域，按规格像素画到画布上，导出下载
-            
-            
           >
             <img
               ref={imgRef}
@@ -141,6 +139,19 @@ export default function Home() {
               alt="uploaded"
               className="absolute max-w-none select-none"
               style={{ left: offset.x, top: offset.y, width: imgSize.w * scale }}
+
+            />
+                                    {/* 人脸参考线：按各规格官方头部比例，位置偏上（下方留下巴和肩膀） */}
+            <div
+              className="pointer-events-none absolute rounded-[50%] border-2 border-dashed border-white/80"
+              style={{
+                left: "50%",
+                transform: "translateX(-50%)",
+                top: frameH * spec.oval.top,
+                width: frameW * spec.oval.w,
+                height: frameH * spec.oval.h,
+                boxShadow: "0 0 0 1px rgba(0,0,0,0.25)",
+              }}
             />
           </div>
           <input
@@ -152,7 +163,7 @@ export default function Home() {
             onChange={(e) => setScale(Number(e.target.value))}
             className="mt-4 w-80"
           />
-          <p className="mt-2 text-xs text-gray-400">Drag to adjust</p>
+          <p className="mt-2 text-xs text-gray-400">Drag to adjust · Align your head within the oval</p>
           <button
             onClick={() => inputRef.current?.click()}
             className="mt-3 text-sm text-gray-500 underline hover:text-gray-800"
