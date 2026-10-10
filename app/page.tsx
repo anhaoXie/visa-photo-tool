@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { removeBackground } from "@imgly/background-removal";
 
 const SPECS = [
   // oval: 椭圆参考线 = 官方头部要求。top/h 占框高比例，w 占框宽比例
@@ -16,6 +17,10 @@ export default function Home() {
   const [scale, setScale] = useState(1);                   // 显示缩放
   const [baseScale, setBaseScale] = useState(1);           // "刚好铺满框"的缩放（缩放下限）
   const [offset, setOffset] = useState({ x: 0, y: 0 });    // 拖动的位移
+  const [removeBg, setRemoveBg] = useState(false);  // 是否AI去背景
+  const [busy, setBusy] = useState(false);          // 正在处理（防连点）
+  const [progress, setProgress] = useState("");     // 进度提示
+
   const imgRef = useRef<HTMLImageElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const drag = useRef<{ sx: number; sy: number; ox: number; oy: number } | null>(null);
@@ -74,36 +79,59 @@ export default function Home() {
   function onPointerUp() {
     drag.current = null;
   }
-    // 核心：把屏幕上框住的区域，按规格像素画到画布上，导出下载
-    function onCrop() {
-      const img = imgRef.current;
-      if (!img) return;
-  
-      const canvas = document.createElement("canvas"); // 内存里造一块画布
-      canvas.width = spec.w;   // 画布的尺寸 = 官方规格像素
-      canvas.height = spec.h;
-      const ctx = canvas.getContext("2d")!;
-      ctx.fillStyle = "#ffffff";  // 先铺白底（防透明PNG变黑）
-      ctx.fillRect(0, 0, spec.w, spec.h);
-  
-      // 屏幕框 → 原图区域的换算（除法 = 把显示像素还原成原始像素）
-      const sx = -offset.x / scale;
-      const sy = -offset.y / scale;
-      const sw = frameW / scale;
-      const sh = frameH / scale;
-  
-      // 从原图的(sx, sy, sw, sh)区域，画到画布的(0, 0, 规格宽, 规格高)
-      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, spec.w, spec.h);
-  
-      // 画布 → 文件 → 触发下载
-      canvas.toBlob((blob) => {
-        if (!blob) return;
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = `visa-photo-${spec.id}.jpg`;
-        a.click();
-      }, "image/jpeg", 0.95);
+      // 核心：裁剪 →（可选）AI去背景贴白底 → 下载
+  async function onCrop() {
+    const img = imgRef.current;
+    if (!img || busy) return;
+    setBusy(true);
+    setProgress("");
+
+    // 第一步：裁剪（坐标换算和原来一样）
+    const cropCanvas = document.createElement("canvas");
+    cropCanvas.width = spec.w;
+    cropCanvas.height = spec.h;
+    const cctx = cropCanvas.getContext("2d")!;
+    cctx.fillStyle = "#ffffff";
+    cctx.fillRect(0, 0, spec.w, spec.h);
+    cctx.drawImage(img, -offset.x / scale, -offset.y / scale, frameW / scale, frameH / scale, 0, 0, spec.w, spec.h);
+
+    try {
+      if (!removeBg) {
+        // 不去背景：和原来一样直接导出
+        cropCanvas.toBlob((blob) => blob && download(blob), "image/jpeg", 0.95);
+      } else {
+        // 去背景：裁剪结果 → AI → 贴到白底 → 导出
+        const croppedBlob: Blob = await new Promise((res) => cropCanvas.toBlob((b) => res(b!), "image/jpeg", 0.95));
+        const cutBlob = await removeBackground(croppedBlob, {
+          progress: (key, current, total) => {
+            const pct = total ? Math.round((current / total) * 100) : 0;
+            setProgress(`AI removing background: ${pct}% (first run downloads model, please wait)`);
+          },
+        });
+        const cutImg = new Image();
+        cutImg.src = URL.createObjectURL(cutBlob);
+        await cutImg.decode();
+        const out = document.createElement("canvas");
+        out.width = spec.w;
+        out.height = spec.h;
+        const octx = out.getContext("2d")!;
+        octx.fillStyle = "#ffffff";
+        octx.fillRect(0, 0, spec.w, spec.h);
+        octx.drawImage(cutImg, 0, 0, spec.w, spec.h);
+        out.toBlob((blob) => blob && download(blob), "image/jpeg", 0.95);
+      }
+    } catch (err) {
+      setProgress("Background removal failed: " + String(err));
     }
+    setBusy(false);
+  }
+
+  function download(blob: Blob) {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `visa-photo-${spec.id}.jpg`;
+    a.click();
+  }
 
   return (
     <main className="flex min-h-screen flex-col items-center bg-gray-50 px-4 py-16">
@@ -188,13 +216,19 @@ export default function Home() {
         ))}
       </div>
 
+      <label className="mt-6 flex cursor-pointer items-center gap-2 text-sm text-gray-600">
+        <input type="checkbox" checked={removeBg} onChange={(e) => setRemoveBg(e.target.checked)} />
+        Remove background with AI (beta, slower)
+      </label>
+
       <button
         onClick={onCrop}
-        disabled={!imgSrc}
-        className="mt-8 rounded-lg bg-black px-8 py-3 font-medium text-white disabled:opacity-30"
+        disabled={!imgSrc || busy}
+        className="mt-4 rounded-lg bg-black px-8 py-3 font-medium text-white disabled:opacity-30"
       >
-        Crop &amp; Download
+        {busy ? "Processing..." : "Crop & Download"}
       </button>
+      {progress && <p className="mt-2 max-w-xs text-center text-xs text-gray-500">{progress}</p>}
       
 
       <p className="mt-6 text-xs text-gray-400">Your photo never leaves your device.</p>
