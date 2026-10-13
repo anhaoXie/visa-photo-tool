@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# regenerated on every `next dev` run — machine-specific agent hints, not project source
+AGENTS.md
+CLAUDE.md

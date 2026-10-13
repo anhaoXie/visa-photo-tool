@@ -2,6 +2,22 @@
   "name": "visa-photo-tool",
   "version": "0.1.0",
   "private": true,
+  "description": "Crop a passport or visa photo to the exact official size, entirely in the browser. No upload, no sign-up.",
+  "homepage": "https://visa.anhaoxie.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/anhaoXie/visa-photo-tool.git"
+  },
+  "license": "MIT",
+  "keywords": [
+    "visa-photo",
+    "passport-photo",
+    "id-photo",
+    "background-removal",
+    "nextjs",
+    "client-side",
+    "privacy"
+  ],
   "scripts": {
     "dev": "next dev",
     "build": "next build",
