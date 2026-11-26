@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { removeBackground } from "@imgly/background-removal";
+import { baseScaleFor, clampOffset, cropSourceRect } from "../lib/cropMath";
 
 const SPECS = [
   // oval: 椭圆参考线 = 官方头部要求。top/h 占框高比例，w 占框宽比例
@@ -28,6 +29,7 @@ export default function Home() {
   // 屏幕上的裁剪框：宽320px，高按规格比例算
   const frameW = 320;
   const frameH = Math.round((frameW * spec.h) / spec.w);
+  const frame = { w: frameW, h: frameH };
 
   function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -40,7 +42,7 @@ export default function Home() {
     const img = imgRef.current!;
     const size = { w: img.naturalWidth, h: img.naturalHeight };
     setImgSize(size);
-    const bs = Math.max(frameW / size.w, frameH / size.h);
+    const bs = baseScaleFor(size, frame);
     setBaseScale(bs);
     setScale(bs);
     setOffset({ x: 0, y: 0 });
@@ -51,17 +53,16 @@ export default function Home() {
     setSpec(s);
     if (!imgSize.w) return;
     const fh = Math.round((frameW * s.h) / s.w);
-    const bs = Math.max(frameW / imgSize.w, fh / imgSize.h);
+    const bs = baseScaleFor(imgSize, { w: frameW, h: fh });
     setBaseScale(bs);
     setScale(bs);
     setOffset({ x: 0, y: 0 });
   }
 
-  // 限制位移：照片必须始终盖住整个框，不能拖出空洞
-  function clamp(x: number, y: number) {
-    const minX = Math.min(0, frameW - imgSize.w * scale);
-    const minY = Math.min(0, frameH - imgSize.h * scale);
-    return { x: Math.max(minX, Math.min(0, x)), y: Math.max(minY, Math.min(0, y)) };
+  // 限制位移：照片必须始终盖住整个框，不能拖出空洞。
+  // scale 作为参数传入，缩放变化时用新 scale 重新夹一次。
+  function clamp(x: number, y: number, s = scale) {
+    return clampOffset({ x, y }, s, imgSize, frame);
   }
 
   // 拖动三件套
@@ -93,7 +94,8 @@ export default function Home() {
     const cctx = cropCanvas.getContext("2d")!;
     cctx.fillStyle = "#ffffff";
     cctx.fillRect(0, 0, spec.w, spec.h);
-    cctx.drawImage(img, -offset.x / scale, -offset.y / scale, frameW / scale, frameH / scale, 0, 0, spec.w, spec.h);
+    const src = cropSourceRect(offset, scale, frame);
+    cctx.drawImage(img, src.x, src.y, src.w, src.h, 0, 0, spec.w, spec.h);
 
     try {
       if (!removeBg) {
@@ -188,7 +190,11 @@ export default function Home() {
             max={baseScale * 3}
             step={0.01}
             value={scale}
-            onChange={(e) => setScale(Number(e.target.value))}
+            onChange={(e) => {
+              const next = Number(e.target.value);
+              setScale(next);
+              setOffset((current) => clampOffset(current, next, imgSize, frame));
+            }}
             className="mt-4 w-80"
           />
           <p className="mt-2 text-xs text-gray-400">Drag to adjust · Align your head within the oval</p>

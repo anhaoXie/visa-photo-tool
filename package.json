@@ -22,7 +22,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "node --test lib/cropMath.test.ts"
   },
   "dependencies": {
     "@imgly/background-removal": "^1.7.0",
